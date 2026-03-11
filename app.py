@@ -1,59 +1,57 @@
 import streamlit as st
+import requests
 from datetime import datetime, timedelta
 
-# Configuração da Página
-st.set_page_config(page_title="CicloPrevisão - Planejador de Treino", page_icon="🚴")
+# --- CONFIGURAÇÃO ---
+API_KEY =  "28b242d7b3ec3a44102b94b2c8a35446" # Coloque sua chave entre as aspas
 
-st.title("🚴 CicloPrevisão")
-st.subheader("Planeje seu treino com base no clima e performance")
+st.set_page_config(page_title="CicloPrevisão Real", page_icon="🚴")
 
-# --- ENTRADA DE DADOS ---
+def buscar_clima(cidade):
+    # Busca coordenadas e depois o clima
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={cidade}&appid={API_KEY}&units=metric&lang=pt_br"
+    response = requests.get(url).json()
+    if response.get("cod") == 200:
+        return {
+            "temp": response['main']['temp'],
+            "desc": response['weather'][0]['description'].capitalize(),
+            "vento": response['wind']['speed'] * 3.6  # Converte m/s para km/h
+        }
+    return None
+
+st.title("🚴 CicloPrevisão Real-Time")
+
+# --- ENTRADA ---
 with st.sidebar:
-    st.header("Configurações do Pedal")
-    origem = st.text_input("Endereço de Início", "Taubaté, SP")
-    destino = st.text_input("Endereço de Destino", "Campos do Jordão, SP")
+    origem = st.text_input("Cidade de Início", "Taubaté")
+    destino = st.text_input("Cidade de Destino", "Campos do Jordão")
+    distancia = st.number_input("Distância (km)", value=45.0)
+    v_media = st.number_input("Velocidade Média (km/h)", value=25.0)
+    hora_inicio = st.time_input("Início", datetime.now().time())
+
+# --- CÁLCULOS ---
+tempo_h = distancia / v_media
+chegada_dt = datetime.combine(datetime.today(), hora_inicio) + timedelta(hours=tempo_h)
+
+st.metric("Previsão de Chegada", chegada_dt.strftime("%H:%M"))
+
+# --- BUSCA REAL ---
+if st.button("Consultar Clima Agora"):
+    clima_inicio = buscar_clima(origem)
+    clima_fim = buscar_clima(destino)
     
-    distancia = st.number_input("Distância estimada (km)", min_value=1.0, value=45.0)
-    v_media = st.number_input("Sua Velocidade Média (km/h)", min_value=5.0, value=25.0)
+    col1, col2 = st.columns(2)
     
-    hora_inicio = st.time_input("Horário de Início", datetime.now().time())
-
-# --- LÓGICA DE CÁLCULO ---
-# Tempo = Distância / Velocidade
-tempo_total_horas = distancia / v_media
-tempo_total_minutos = int(tempo_total_horas * 60)
-
-# Cálculo dos Horários
-inicio_dt = datetime.combine(datetime.today(), hora_inicio)
-chegada_dt = inicio_dt + timedelta(minutes=tempo_total_minutos)
-meio_dt = inicio_dt + timedelta(minutes=tempo_total_minutos // 2)
-
-# --- EXIBIÇÃO DOS RESULTADOS ---
-st.info(f"⏱️ **Duração Estimada:** {tempo_total_minutos} minutos ({tempo_total_horas:.2f}h)")
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Partida", inicio_dt.strftime("%H:%M"))
-col2.metric("Meio (Checkpoint)", meio_dt.strftime("%H:%M"))
-col3.metric("Chegada", chegada_dt.strftime("%H:%M"))
-
-st.divider()
-
-# --- SIMULAÇÃO DE CRONOGRAMA DE PREVISÃO ---
-st.write("### 🌤️ Cronograma de Previsão do Tempo")
-
-# Aqui no futuro conectaremos com a API (OpenWeather)
-# Por enquanto, mostramos como os dados aparecerão:
-dados_simulados = [
-    {"hora": inicio_dt.strftime("%H:%M"), "local": origem, "temp": "22°C", "condicao": "☀️ Limpo", "vento": "12 km/h SE"},
-    {"hora": meio_dt.strftime("%H:%M"), "local": "Meio do Caminho", "temp": "25°C", "condicao": "⛅ Nublado", "vento": "15 km/h E"},
-    {"hora": chegada_dt.strftime("%H:%M"), "local": destino, "temp": "18°C", "condicao": "🌧️ Chuva Leve", "vento": "8 km/h S"},
-]
-
-for ponto in dados_simulados:
-    with st.expander(f"{ponto['hora']} - {ponto['local']}"):
-        st.write(f"**Temperatura:** {ponto['temp']}")
-        st.write(f"**Condição:** {ponto['condicao']}")
-        st.write(f"**Vento:** {ponto['vento']}")
-
-if "Chuva" in dados_simulados[-1]['condicao']:
-    st.warning("⚠️ Atenção: Previsão de chuva para o horário da sua chegada!")
+    if clima_inicio:
+        with col1:
+            st.success(f"Partida: {origem}")
+            st.write(f"🌡️ {clima_inicio['temp']}°C")
+            st.write(f"☁️ {clima_inicio['desc']}")
+            st.write(f"💨 Vento: {clima_inicio['vento']:.1f} km/h")
+            
+    if clima_fim:
+        with col2:
+            st.info(f"Chegada: {destino}")
+            st.write(f"🌡️ {clima_fim['temp']}°C")
+            st.write(f"☁️ {clima_fim['desc']}")
+            st.write(f"💨 Vento: {clima_fim['vento']:.1f} km/h")
