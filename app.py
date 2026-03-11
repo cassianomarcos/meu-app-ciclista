@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 # --- 1. CONFIGURAÇÃO (COLOQUE SUA CHAVE AQUI) ---
 # Se ainda não tiver a chave, o app mostrará um aviso amigável.
-API_KEY = "SUA_CHAVE_AQUI" 
+API_KEY = "28b242d7b3ec3a44102b94b2c8a35446" 
 
 st.set_page_config(page_title="Planejador de Pedal", page_icon="🚴")
 
