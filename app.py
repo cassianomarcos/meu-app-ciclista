@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, time
 
 # --- 1. CONFIGURAÇÃO ---
 # Substitua pela sua chave do OpenWeatherMap
-API_KEY = "SUA_CHAVE_AQUI" 
+API_KEY = "28b242d7b3ec3a44102b94b2c8a35446" 
 
 st.set_page_config(page_title="CicloPrevisão Pro", page_icon="🚴")
 
