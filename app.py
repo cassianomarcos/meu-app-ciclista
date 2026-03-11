@@ -1,80 +1,83 @@
 import streamlit as st
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 
-# --- 1. CONFIGURAÇÃO (COLOQUE SUA CHAVE AQUI) ---
-# Se ainda não tiver a chave, o app mostrará um aviso amigável.
-API_KEY = "28b242d7b3ec3a44102b94b2c8a35446" 
+# --- 1. CONFIGURAÇÃO ---
+# Substitua pela sua chave do OpenWeatherMap
+API_KEY = "SUA_CHAVE_AQUI" 
 
-st.set_page_config(page_title="Planejador de Pedal", page_icon="🚴")
+st.set_page_config(page_title="CicloPrevisão Pro", page_icon="🚴")
 
-# Função para buscar clima real
 def buscar_clima(cidade):
-    if API_KEY == "SUA_CHAVE_AQUI":
-        return {"erro": "Falta a API Key"}
-    
+    if not API_KEY or API_KEY == "SUA_CHAVE_AQUI":
+        return None
     url = f"http://api.openweathermap.org/data/2.5/weather?q={cidade},BR&appid={API_KEY}&units=metric&lang=pt_br"
     try:
-        response = requests.get(url).json()
-        if response.get("cod") == 200:
-            return {
-                "temp": response['main']['temp'],
-                "desc": response['weather'][0]['description'].capitalize(),
-                "vento": response['wind']['speed'] * 3.6
-            }
+        r = requests.get(url, timeout=5).json()
+        if r.get("cod") == 200:
+            return {"temp": r['main']['temp'], "desc": r['weather'][0]['description'].capitalize(), "vento": r['wind']['speed'] * 3.6}
     except:
         return None
     return None
 
-st.title("🚴 Planejador de Treino: Taubaté e Região")
+st.title("🚴 Planejador de Treino")
 
-# --- 2. ENTRADA DE DADOS (CAMPOS SOLICITADOS) ---
-st.markdown("### 📋 Dados do Treino")
-col_a, col_b = st.columns(2)
+# --- 2. ENTRADA DE DADOS ---
+# Usando colunas para organizar melhor o layout
+col_dados, col_tempo = st.columns(2)
 
-with col_a:
-    origem = st.text_input("Endereço/Cidade de Início", "Taubaté")
-    destino = st.text_input("Endereço/Cidade de Destino", "Campos do Jordão")
+with col_dados:
+    origem = st.text_input("📍 Início (Cidade)", "Taubaté")
+    destino = st.text_input("🏁 Destino (Cidade)", "Campos do Jordão")
+    distancia = st.number_input("📏 Distância (km)", min_value=1.0, value=45.0)
 
-with col_b:
-    # Campo de Horário de Saída
-    hora_saida = st.time_input("Horário de Início do Pedal", datetime.now().time())
-    v_media = st.number_input("Velocidade Média (km/h)", min_value=1.0, value=25.0)
+with col_tempo:
+    v_media = st.number_input("⚡ Vel. Média (km/h)", min_value=1.0, value=25.0)
+    
+    # CORREÇÃO DO HORÁRIO: Usando um valor padrão de objeto 'time' e uma 'key'
+    # Se o erro persistir no celular, tente clicar no ícone de relógio
+    hora_saida = st.time_input(
+        "⏰ Horário de Saída", 
+        value=time(8, 0), # Começa às 08:00 por padrão
+        key="horario_pedal"
+    )
 
-distancia = st.number_input("Distância Total Estimada (km)", min_value=1.0, value=45.0)
-
-# --- 3. LÓGICA DE CRONOGRAMA ---
-tempo_total_horas = distancia / v_media
-hoje = datetime.today()
-inicio_dt = datetime.combine(hoje, hora_saida)
-chegada_dt = inicio_dt + timedelta(hours=tempo_total_horas)
+# --- 3. CÁLCULOS ---
+try:
+    tempo_total_h = distancia / v_media
+    minutos_totais = int(tempo_total_h * 60)
+    
+    # Criando o objeto de data/hora para o cálculo
+    inicio_dt = datetime.combine(datetime.today(), hora_saida)
+    chegada_dt = inicio_dt + timedelta(minutes=minutos_totais)
+    
+    st.success(f"✅ **Resumo:** Partida às **{inicio_dt.strftime('%H:%M')}** | Chegada prevista: **{chegada_dt.strftime('%H:%M')}**")
+    st.info(f"⏱️ Tempo total de pedal: **{minutos_totais} minutos**")
+except Exception as e:
+    st.error("Erro ao calcular tempo. Verifique a velocidade.")
 
 st.divider()
 
-# --- 4. EXIBIÇÃO DO CLIMA ---
-st.markdown(f"### 🌤️ Previsão para o Percurso")
+# --- 4. CLIMA REAL ---
+if st.button("🔄 Atualizar Previsão do Tempo"):
+    with st.spinner("Buscando clima atual..."):
+        c_origem = buscar_clima(origem)
+        c_destino = buscar_clima(destino)
+        
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            st.markdown(f"**Partida: {origem}**")
+            if c_origem:
+                st.metric("Temp", f"{c_origem['temp']}°C")
+                st.caption(f"{c_origem['desc']} | Vento: {c_origem['vento']:.1f} km/h")
+            else:
+                st.warning("Verifique a API Key")
 
-clima_origem = buscar_clima(origem)
-clima_destino = buscar_clima(destino)
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader(f"Partida ({inicio_dt.strftime('%H:%M')})")
-    if clima_origem and "temp" in clima_origem:
-        st.metric("Temperatura", f"{clima_origem['temp']}°C")
-        st.write(f"**Condição:** {clima_origem['desc']}")
-        st.write(f"**Vento:** {clima_origem['vento']:.1f} km/h")
-    else:
-        st.warning("Insira uma API Key válida para ver o clima real.")
-
-with col2:
-    st.subheader(f"Chegada ({chegada_dt.strftime('%H:%M')})")
-    if clima_destino and "temp" in clima_destino:
-        st.metric("Temperatura", f"{clima_destino['temp']}°C")
-        st.write(f"**Condição:** {clima_destino['desc']}")
-        st.write(f"**Vento:** {clima_destino['vento']:.1f} km/h")
-    else:
-        st.write("Aguardando dados...")
-
-st.info(f"💡 **Resumo:** Seu pedal terá duração de **{tempo_total_horas:.2f}h**. Se sair às {inicio_dt.strftime('%H:%M')}, chegará por volta de **{chegada_dt.strftime('%H:%M')}**.")
+        with c2:
+            st.markdown(f"**Chegada: {destino}**")
+            if c_destino:
+                st.metric("Temp", f"{c_destino['temp']}°C")
+                st.caption(f"{c_destino['desc']} | Vento: {c_destino['vento']:.1f} km/h")
+            else:
+                st.write("Dados indisponíveis")
